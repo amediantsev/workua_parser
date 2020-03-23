@@ -1,5 +1,4 @@
 import sqlite3
-from time import sleep
 
 import requests
 from bs4 import BeautifulSoup
@@ -10,13 +9,16 @@ from utils import random_sleep, save_info
 
 db = sqlite3.connect('workua.sqlite')
 cur = db.cursor()
-cur.execute('''CREATE TABLE jobs (
-            workua_id INTEGER NOT NULL,
-            vacancy TEXT NOT NULL,
-            company TEXT NOT NULL,
-            address TEXT,
-            salary TEXT)'''
-            )
+try:
+    cur.execute('''CREATE TABLE jobs (
+                workua_id INTEGER NOT NULL,
+                vacancy TEXT NOT NULL,
+                company TEXT NOT NULL,
+                address TEXT,
+                salary TEXT)'''
+                )
+except sqlite3.OperationalError:
+    pass
 
 # global variables
 HOST = 'https://www.work.ua'
@@ -68,7 +70,7 @@ def main():
 
             workua_id = int(href.split('/')[-2])
 
-            vacancy = title
+            vacancy = vac_soup.find('h1', id='h1-name').text
 
             address = vac_soup.find('p', class_='text-indent add-top-sm').text.strip()
             address = address.split('\n')[0]
@@ -78,18 +80,20 @@ def main():
                 if block.find('a') != None:
                     company = block.find('a').find('b').text
                 else:
-                    salary = block.find('b')
-                    if salary != None:
-                        salary = salary.text
-                        salary = salary.replace('\u202f', ' ')
-                        salary = salary.replace('\u2009', ' ')
+                    if block.find('b') != None:
+                        salary = block.find('b').text
+                        salary = salary.replace('\u202f', '')
+                        salary = salary.replace('\u2009', '')
+                if not 'salary' in locals():
+                    salary = None
 
             data = (workua_id, vacancy, company, address, salary)
             cur.execute('''INSERT INTO jobs VALUES (?, ?, ?, ?, ?)''', data)
+
             db.commit()
 
         save_info(result)
-    cur.execute()
+
     db.close()
 
 if __name__ == "__main__":
