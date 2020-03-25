@@ -1,12 +1,28 @@
+import sqlite3
+
 import requests
 from bs4 import BeautifulSoup
 from user_agent import generate_user_agent
 
 from utils import random_sleep, save_info
 
+
+db = sqlite3.connect('workua.sqlite')
+cur = db.cursor()
+try:
+    cur.execute('''CREATE TABLE jobs (
+                workua_id INTEGER NOT NULL,
+                vacancy TEXT NOT NULL,
+                company TEXT NOT NULL,
+                address TEXT,
+                salary TEXT)'''
+                )
+except sqlite3.OperationalError:
+    pass
+
 # global variables
 HOST = 'https://www.work.ua'
-ROOT_PATH = '/ru/jobs/'
+ROOT_PATH = '/jobs/'
 
 
 def main():
@@ -16,8 +32,8 @@ def main():
         page += 1
 
         payload = {
-           'ss': 1,
-           'page': page,
+            'ss': 1,
+            'page': page,
         }
 
         user_agent = generate_user_agent()
@@ -48,10 +64,37 @@ def main():
             title = tag_a.text
             href = tag_a['href']
             result.append([title, href])
-            # get vacancy full info
+            vac_response = requests.get(HOST + href, headers=headers)
+            vac_html = vac_response.text
+            vac_soup = BeautifulSoup(vac_html, 'html.parser')
+
+            workua_id = int(href.split('/')[-2])
+
+            vacancy = vac_soup.find('h1', id='h1-name').text
+
+            address = vac_soup.find('p', class_='text-indent add-top-sm').text.strip()
+            address = address.split('\n')[0]
+
+            blocks = vac_soup.find_all('p', class_='text-indent text-muted add-top-sm')
+            for block in blocks:
+                if block.find('a') != None:
+                    company = block.find('a').find('b').text
+                else:
+                    if block.find('b') != None:
+                        salary = block.find('b').text
+                        salary = salary.replace('\u202f', '')
+                        salary = salary.replace('\u2009', '')
+                if not 'salary' in locals():
+                    salary = None
+
+            data = (workua_id, vacancy, company, address, salary)
+            cur.execute('''INSERT INTO jobs VALUES (?, ?, ?, ?, ?)''', data)
+
+            db.commit()
 
         save_info(result)
 
+    db.close()
 
 if __name__ == "__main__":
     main()
