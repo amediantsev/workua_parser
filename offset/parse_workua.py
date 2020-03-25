@@ -9,16 +9,13 @@ from utils import random_sleep, save_info
 
 db = sqlite3.connect('workua.sqlite')
 cur = db.cursor()
-try:
-    cur.execute('''CREATE TABLE jobs (
-                workua_id INTEGER NOT NULL,
-                vacancy TEXT NOT NULL,
-                company TEXT NOT NULL,
-                address TEXT,
-                salary TEXT)'''
-                )
-except sqlite3.OperationalError:
-    pass
+cur.execute('''CREATE TABLE IF NOT EXISTS jobs (
+            workua_id INTEGER NOT NULL,
+            vacancy TEXT NOT NULL,
+            company TEXT NOT NULL,
+            address TEXT,
+            salary TEXT)'''
+            )
 
 # global variables
 HOST = 'https://www.work.ua'
@@ -77,10 +74,10 @@ def main():
 
             blocks = vac_soup.find_all('p', class_='text-indent text-muted add-top-sm')
             for block in blocks:
-                if block.find('a') != None:
+                if block.find('a') is not None:
                     company = block.find('a').find('b').text
                 else:
-                    if block.find('b') != None:
+                    if block.find('b') is not None:
                         salary = block.find('b').text
                         salary = salary.replace('\u202f', '')
                         salary = salary.replace('\u2009', '')
